@@ -1,15 +1,24 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { SolidityAnalysis } from "../types";
 
 export const analyzeSolidityCode = async (code: string, error: string): Promise<SolidityAnalysis> => {
-  // Initialize inside the function to avoid top-level ReferenceErrors 
-  // and ensure we grab the latest API_KEY from the environment
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("Missing Gemini API Key. Please ensure process.env.API_KEY is set in your environment variables.");
+  }
+
+  // Always create a new instance to ensure it uses the latest environment state
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
     Analyze the following Solidity code and the associated compiler/runtime error.
-    Provide a detailed explanation of the fix and the corrected code.
+    Return a JSON object with:
+    1. explanation: Detailed fix explanation.
+    2. suggestedFix: Complete corrected code.
+    3. missingFiles: (Optional) Array of {filename, content} for missing dependencies.
+    4. isCritical: Boolean.
     
     Code:
     ${code}
@@ -18,51 +27,42 @@ export const analyzeSolidityCode = async (code: string, error: string): Promise<
     ${error}
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          explanation: {
-            type: Type.STRING,
-            description: "Detailed explanation of what went wrong and why.",
-          },
-          suggestedFix: {
-            type: Type.STRING,
-            description: "The complete fixed Solidity code for the main contract.",
-          },
-          missingFiles: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                filename: { type: Type.STRING },
-                content: { type: Type.STRING },
-              },
-              required: ["filename", "content"],
-            },
-            description: "Any dependencies or parent contracts that might be missing or need to be created.",
-          },
-          isCritical: {
-            type: Type.BOOLEAN,
-            description: "Whether the bug prevents compilation.",
-          }
-        },
-        required: ["explanation", "suggestedFix", "isCritical"],
-      },
-      systemInstruction: "You are a world-class Smart Contract Security Auditor and Solidity Expert. You help developers fix compilation and logic errors in their Web3 projects. Focus on modern Solidity standards (>=0.8.0).",
-    },
-  });
-
   try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            explanation: { type: Type.STRING },
+            suggestedFix: { type: Type.STRING },
+            missingFiles: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  filename: { type: Type.STRING },
+                  content: { type: Type.STRING },
+                },
+                required: ["filename", "content"],
+              },
+            },
+            isCritical: { type: Type.BOOLEAN },
+          },
+          required: ["explanation", "suggestedFix", "isCritical"],
+        },
+        systemInstruction: "You are an expert Solidity developer. Fix the provided smart contract error and return valid JSON.",
+      },
+    });
+
     const text = response.text;
-    if (!text) throw new Error("Model returned no text output.");
+    if (!text) throw new Error("The model returned an empty response.");
+    
     return JSON.parse(text) as SolidityAnalysis;
-  } catch (e) {
-    console.error("AI Response Parsing Error:", e);
-    throw new Error("Failed to parse AI response. Please try again.");
+  } catch (err: any) {
+    console.error("Gemini API Error:", err);
+    throw new Error(err.message || "An error occurred while communicating with the Gemini API.");
   }
 };

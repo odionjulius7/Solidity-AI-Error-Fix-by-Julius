@@ -29,6 +29,11 @@ contract AddFiveToStorage is SimpleStorage {
     setIsAnalyzing(true);
     setError(null);
     try {
+      // Check if API key is available before making the call
+      if (!process.env.API_KEY) {
+        throw new Error("Missing API Key. Ensure API_KEY is set in your environment variables. If you just added it to Vercel, you may need to redeploy your project for it to take effect.");
+      }
+      
       const result = await analyzeSolidityCode(code, errorMsg);
       setAnalysis(result);
     } catch (err: any) {
@@ -65,8 +70,8 @@ contract AddFiveToStorage is SimpleStorage {
             onClick={() => setShowDeployGuide(true)}
             className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-semibold"
           >
-            <i className="fas fa-cloud-arrow-up"></i>
-            How to Host
+            <i className="fas fa-circle-question"></i>
+            Troubleshoot
           </button>
         </header>
 
@@ -79,7 +84,6 @@ contract AddFiveToStorage is SimpleStorage {
                   <i className="fas fa-code text-indigo-400"></i>
                   <h2 className="text-xl font-bold">Solidity Code</h2>
                 </div>
-                <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold bg-slate-800 px-2 py-1 rounded">Main Contract</span>
               </div>
               <textarea
                 value={code}
@@ -133,7 +137,7 @@ contract AddFiveToStorage is SimpleStorage {
                   <i className="fas fa-shield-halved text-6xl opacity-20"></i>
                 </div>
                 <h3 className="text-xl font-semibold mb-2 text-slate-400">Ready for Analysis</h3>
-                <p className="max-w-xs text-slate-500">Upload your code and let Gemini 3 Pro identify the root cause of your smart contract issues.</p>
+                <p className="max-w-xs text-slate-500">Upload your code and let Gemini identify the root cause of your smart contract issues.</p>
               </div>
             )}
 
@@ -148,9 +152,9 @@ contract AddFiveToStorage is SimpleStorage {
             {error && (
               <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-rose-300 flex items-start gap-4 animate-in slide-in-from-top-4 duration-300">
                 <i className="fas fa-triangle-exclamation text-xl mt-1"></i>
-                <div>
-                  <h3 className="font-bold text-lg mb-1">AI Error</h3>
-                  <p>{error}</p>
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg mb-1">Configuration Required</h3>
+                  <p className="mb-4">{error}</p>
                 </div>
               </div>
             )}
@@ -173,9 +177,6 @@ contract AddFiveToStorage is SimpleStorage {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest">Corrected Main Contract</h3>
-                      {analysis.isCritical && (
-                        <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/30 font-bold uppercase">Critical Fix</span>
-                      )}
                     </div>
                     <CodeBlock code={analysis.suggestedFix} />
                   </div>
@@ -196,28 +197,18 @@ contract AddFiveToStorage is SimpleStorage {
                     </div>
                   )}
                 </div>
-
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6">
-                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-amber-200">
-                    <i className="fas fa-graduation-cap text-amber-400"></i>
-                    Developer Best Practices
-                  </h3>
-                  <div className="text-slate-400 text-sm leading-relaxed">
-                    When managing dependencies in Solidity, it's safer to use explicit imports or interface files. If you are developing locally, consider using <code className="text-indigo-400 bg-slate-800 px-1.5 py-0.5 rounded">npm install @openzeppelin/contracts</code> for standard audited components.
-                  </div>
-                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Deployment Modal */}
+        {/* Help Modal */}
         {showDeployGuide && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl ring-1 ring-white/10">
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-extrabold text-white">How to Host This App</h2>
+                  <h2 className="text-2xl font-extrabold text-white">Troubleshooting Deployment</h2>
                   <button 
                     onClick={() => setShowDeployGuide(false)}
                     className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-white transition-colors"
@@ -228,46 +219,31 @@ contract AddFiveToStorage is SimpleStorage {
 
                 <div className="space-y-8">
                   <section className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 rounded-lg text-white font-bold">1</span>
-                      <h3 className="text-lg font-bold">Get a Gemini API Key</h3>
+                    <div className="flex items-center gap-3 text-indigo-400">
+                      <i className="fas fa-key text-xl"></i>
+                      <h3 className="text-lg font-bold">1. Why is the screen blank?</h3>
                     </div>
                     <p className="text-slate-400 ml-11">
-                      Visit <a href="https://aistudio.google.com/" target="_blank" className="text-indigo-400 hover:underline">Google AI Studio</a>, click "Get API Key", and generate a new key.
+                      If the screen is blank on Vercel, it's often because the project is missing a <code className="text-indigo-300 bg-slate-800 px-2 py-1 rounded">package.json</code> file or the browser cannot parse <code className="text-indigo-300 bg-slate-800 px-2 py-1 rounded">.tsx</code> files directly. In a production environment, you typically need a build step (like Vite or Next.js) to transpile the code.
                     </p>
                   </section>
 
                   <section className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 rounded-lg text-white font-bold">2</span>
-                      <h3 className="text-lg font-bold">Push to GitHub</h3>
+                    <div className="flex items-center gap-3 text-emerald-400">
+                      <i className="fas fa-sync text-xl"></i>
+                      <h3 className="text-lg font-bold">2. How to fix the API Key error?</h3>
                     </div>
                     <p className="text-slate-400 ml-11">
-                      Create a repository on GitHub and upload all project files. Make sure <code className="text-indigo-300">index.html</code> is in the root.
+                      The environment variable must be named <code className="text-emerald-400 bg-slate-800 px-2 py-1 rounded">API_KEY</code>. After adding it in Vercel, you <strong>must redeploy</strong> your project (Deployments -> Redeploy) for the changes to take effect.
                     </p>
-                  </section>
-
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 rounded-lg text-white font-bold">3</span>
-                      <h3 className="text-lg font-bold">Deploy to Vercel</h3>
-                    </div>
-                    <div className="ml-11 space-y-3">
-                      <p className="text-slate-400">Sign in to <a href="https://vercel.com" target="_blank" className="text-indigo-400 hover:underline">Vercel.com</a>, import your repo, and most importantly:</p>
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-sm">
-                        <div className="text-emerald-400 mb-1 font-bold">Environment Variables Section:</div>
-                        <div className="text-slate-300">KEY: <span className="text-white">API_KEY</span></div>
-                        <div className="text-slate-300">VALUE: <span className="text-white">your_gemini_key_here</span></div>
-                      </div>
-                    </div>
                   </section>
                 </div>
 
                 <button 
                   onClick={() => setShowDeployGuide(false)}
-                  className="w-full mt-10 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all"
+                  className="w-full mt-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20"
                 >
-                  Got it, thanks!
+                  I Understand
                 </button>
               </div>
             </div>
@@ -275,22 +251,9 @@ contract AddFiveToStorage is SimpleStorage {
         )}
 
         {/* Footer */}
-        <footer className="mt-20 pt-10 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6">
+        <footer className="mt-20 pt-10 border-t border-slate-900 text-center">
           <div className="text-slate-500 text-sm">
-            <p>© 2024 SolidityFix AI. Built for Smart Contract Developers.</p>
-          </div>
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-slate-500 hover:text-indigo-400 transition-colors text-sm font-medium flex items-center gap-2">
-              <i className="fab fa-github"></i> Source
-            </a>
-            <a href="#" className="text-slate-500 hover:text-indigo-400 transition-colors text-sm font-medium flex items-center gap-2">
-              <i className="fas fa-book"></i> API Docs
-            </a>
-            <div className="h-4 w-px bg-slate-800"></div>
-            <span className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-tighter">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Gemini 3 Pro Active
-            </span>
+            <p>© 2024 SolidityFix AI. Powered by Google Gemini.</p>
           </div>
         </footer>
       </div>
