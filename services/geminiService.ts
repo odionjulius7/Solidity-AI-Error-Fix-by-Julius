@@ -2,9 +2,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { SolidityAnalysis } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 export const analyzeSolidityCode = async (code: string, error: string): Promise<SolidityAnalysis> => {
+  // Initialize inside the function to avoid top-level ReferenceErrors 
+  // and ensure we grab the latest API_KEY from the environment
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
   const prompt = `
     Analyze the following Solidity code and the associated compiler/runtime error.
     Provide a detailed explanation of the fix and the corrected code.
@@ -56,8 +58,11 @@ export const analyzeSolidityCode = async (code: string, error: string): Promise<
   });
 
   try {
-    return JSON.parse(response.text || '{}') as SolidityAnalysis;
+    const text = response.text;
+    if (!text) throw new Error("Model returned no text output.");
+    return JSON.parse(text) as SolidityAnalysis;
   } catch (e) {
-    throw new Error("Failed to parse AI response. The model might have returned malformed JSON.");
+    console.error("AI Response Parsing Error:", e);
+    throw new Error("Failed to parse AI response. Please try again.");
   }
 };
