@@ -1,0 +1,5 @@
+{
+  "name": "SolidityFix AI Troubleshooter",
+  "description": "An advanced AI-powered debugger for Solidity smart contracts. Paste your code and error messages to receive instant structural fixes, explanations, and optimized contract code using Gemini 3 Pro.",
+  "requestFramePermissions": []
+}
