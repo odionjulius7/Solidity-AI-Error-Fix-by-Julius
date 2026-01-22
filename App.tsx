@@ -4,6 +4,13 @@ import { analyzeSolidityCode } from './services/geminiService.ts';
 import { SolidityAnalysis } from './types.ts';
 import CodeBlock from './components/CodeBlock.tsx';
 
+declare global {
+  interface Window {
+    // Use any to avoid conflict with existing global AIStudio type and satisfy identical modifiers requirement
+    aistudio: any;
+  }
+}
+
 const App: React.FC = () => {
   const [code, setCode] = useState<string>(`// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
@@ -20,23 +27,60 @@ contract AddFiveToStorage is SimpleStorage {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysis, setAnalysis] = useState<SolidityAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
+  const [hasKey, setHasKey] = useState<boolean>(false);
+  const [isCheckingKey, setIsCheckingKey] = useState<boolean>(true);
 
   const resultRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    checkApiKey();
+  }, []);
+
+  const checkApiKey = async () => {
+    try {
+      // Use optional chaining to safely check if window.aistudio is available
+      const selected = await window.aistudio?.hasSelectedApiKey();
+      setHasKey(selected || !!process.env.API_KEY);
+    } catch (e) {
+      setHasKey(!!process.env.API_KEY);
+    } finally {
+      setIsCheckingKey(false);
+    }
+  };
+
+  const handleConnectKey = async () => {
+    try {
+      // Trigger API key selection dialog
+      await window.aistudio?.openSelectKey();
+      // Assume success per instructions and update state to proceed
+      setHasKey(true);
+    } catch (e) {
+      setError("Failed to open API key selection dialog.");
+    }
+  };
+
   const handleFix = async () => {
     if (!code.trim()) return;
+    
+    // Final check before proceeding - prompt for key if missing
+    if (!hasKey && !process.env.API_KEY) {
+      await handleConnectKey();
+      return;
+    }
+
     setIsAnalyzing(true);
     setError(null);
     try {
-      if (!process.env.API_KEY) {
-        throw new Error("Missing API_KEY environment variable. \n\n1. Go to Vercel Project Settings > Environment Variables.\n2. Add API_KEY with your value.\n3. IMPORTANT: Go to 'Deployments', click the three dots on your latest deployment, and select 'Redeploy' to apply changes.");
-      }
-      
       const result = await analyzeSolidityCode(code, errorMsg);
       setAnalysis(result);
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred during analysis.");
+      // If the error suggests key issues or not found, reset key state to prompt re-selection
+      if (err.message?.includes("entity was not found") || err.message?.includes("API key")) {
+        setError("API Key verification failed. Please re-select your key from a paid project.");
+        setHasKey(false);
+      } else {
+        setError(err.message || "An unexpected error occurred during analysis.");
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -47,6 +91,14 @@ contract AddFiveToStorage is SimpleStorage {
       resultRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [analysis]);
+
+  if (isCheckingKey) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 selection:bg-indigo-500/30">
@@ -61,18 +113,46 @@ contract AddFiveToStorage is SimpleStorage {
               <h1 className="text-3xl font-extrabold text-white tracking-tight">
                 Solidity<span className="text-indigo-500">Fix</span> AI
               </h1>
-              <p className="text-slate-500 text-sm font-medium">Smart Contract Debugger v1.0</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`w-2 h-2 rounded-full ${hasKey ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">
+                  {hasKey ? 'API Active: Gemini 3 Pro' : 'API Disconnected'}
+                </p>
+              </div>
             </div>
           </div>
           
-          <button 
-            onClick={() => setShowTroubleshoot(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-semibold"
-          >
-            <i className="fas fa-circle-question"></i>
-            Troubleshoot Key
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleConnectKey}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-semibold"
+            >
+              <i className="fas fa-key"></i>
+              {hasKey ? 'Change Key' : 'Connect API Key'}
+            </button>
+          </div>
         </header>
+
+        {/* API Selection Overlay if not connected */}
+        {!hasKey && !process.env.API_KEY && (
+          <div className="bg-indigo-600/10 border border-indigo-500/30 rounded-3xl p-8 mb-12 flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-top-4">
+            <div className="max-w-2xl">
+              <h2 className="text-2xl font-bold text-white mb-2">Setup Required</h2>
+              <p className="text-slate-400 leading-relaxed">
+                To use the advanced Gemini 3 Pro debugger, you must select an API key from a paid GCP project. 
+                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-indigo-400 hover:underline ml-1">
+                  Learn more about billing.
+                </a>
+              </p>
+            </div>
+            <button 
+              onClick={handleConnectKey}
+              className="whitespace-nowrap px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
+            >
+              Select API Key
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Section */}
@@ -120,7 +200,7 @@ contract AddFiveToStorage is SimpleStorage {
               ) : (
                 <>
                   <i className="fas fa-wand-magic-sparkles"></i>
-                  Fix This Error
+                  {hasKey ? 'Fix This Error' : 'Connect Key to Start'}
                 </>
               )}
             </button>
@@ -133,8 +213,8 @@ contract AddFiveToStorage is SimpleStorage {
                 <div className="p-6 rounded-full bg-slate-900/30 mb-6 group-hover:scale-110 transition-transform duration-500">
                   <i className="fas fa-shield-halved text-6xl opacity-20"></i>
                 </div>
-                <h3 className="text-xl font-semibold mb-2 text-slate-400">Ready for Analysis</h3>
-                <p className="max-w-xs text-slate-500">Upload your code and let Gemini identify the root cause of your issues.</p>
+                <h3 className="text-xl font-semibold mb-2 text-slate-400">Debugger Engine Ready</h3>
+                <p className="max-w-xs text-slate-500">Upload your code and get instant, optimized fixes for your smart contracts.</p>
               </div>
             )}
 
@@ -150,7 +230,7 @@ contract AddFiveToStorage is SimpleStorage {
               <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-rose-300 flex items-start gap-4 animate-in slide-in-from-top-4 duration-300">
                 <i className="fas fa-triangle-exclamation text-xl mt-1"></i>
                 <div className="flex-1 whitespace-pre-line">
-                  <h3 className="font-bold text-lg mb-1">Fix Required</h3>
+                  <h3 className="font-bold text-lg mb-1">Execution Error</h3>
                   <p>{error}</p>
                 </div>
               </div>
@@ -197,46 +277,8 @@ contract AddFiveToStorage is SimpleStorage {
           </div>
         </div>
 
-        {/* Troubleshoot Modal */}
-        {showTroubleshoot && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl ring-1 ring-white/10 p-8">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-extrabold text-white">API Key Help</h2>
-                <button onClick={() => setShowTroubleshoot(false)} className="text-slate-500 hover:text-white transition-colors">
-                  <i className="fas fa-times text-xl"></i>
-                </button>
-              </div>
-              <div className="space-y-6">
-                <p className="text-slate-400">If you added your key to Vercel and still see an error:</p>
-                <div className="bg-slate-950 border border-slate-800 p-6 rounded-xl space-y-4">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
-                    <span className="text-slate-200">Go to your <b>Vercel Dashboard</b>.</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center text-xs font-bold">2</span>
-                    <span className="text-slate-200">Select the <b>Deployments</b> tab.</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center text-xs font-bold">3</span>
-                    <span className="text-slate-200">Click the <b>Redeploy</b> button on your latest build.</span>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-500 italic">Environment variables are only applied during the build process, so a redeploy is mandatory.</p>
-              </div>
-              <button 
-                onClick={() => setShowTroubleshoot(false)}
-                className="w-full mt-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all"
-              >
-                I'll redeploy now
-              </button>
-            </div>
-          </div>
-        )}
-
         <footer className="mt-20 pt-10 border-t border-slate-900 text-center">
-          <p className="text-slate-500 text-sm">© 2024 SolidityFix AI. Built with Gemini 3 Pro.</p>
+          <p className="text-slate-500 text-sm">© 2024 SolidityFix AI. Powered by Gemini 3 Pro.</p>
         </footer>
       </div>
     </div>
