@@ -5,6 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SolidityFix AI</title>
+  <script>
+    // Critical: Initialize process.env shim before any modules load
+    window.process = window.process || { env: {} };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -16,17 +20,11 @@
     .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
-    /* Scrollbar Styling */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
   </style>
-  <script>
-    // Robust shim for process.env
-    window.process = window.process || {};
-    window.process.env = window.process.env || {};
-  </script>
   <script type="importmap">
 {
   "imports": {

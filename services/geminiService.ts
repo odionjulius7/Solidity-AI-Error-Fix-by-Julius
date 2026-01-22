@@ -1,15 +1,14 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { SolidityAnalysis } from "../types";
+import { SolidityAnalysis } from "../types.ts";
 
 export const analyzeSolidityCode = async (code: string, error: string): Promise<SolidityAnalysis> => {
   const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
-    throw new Error("Missing Gemini API Key. Please ensure process.env.API_KEY is set in your environment variables.");
+    throw new Error("Missing API Key. Check the Troubleshooting guide in the header.");
   }
 
-  // Always create a new instance to ensure it uses the latest environment state
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
@@ -53,7 +52,7 @@ export const analyzeSolidityCode = async (code: string, error: string): Promise<
           },
           required: ["explanation", "suggestedFix", "isCritical"],
         },
-        systemInstruction: "You are an expert Solidity developer. Fix the provided smart contract error and return valid JSON.",
+        systemInstruction: "You are a world-class Solidity expert. Fix the code and return only valid JSON.",
       },
     });
 
@@ -63,6 +62,6 @@ export const analyzeSolidityCode = async (code: string, error: string): Promise<
     return JSON.parse(text) as SolidityAnalysis;
   } catch (err: any) {
     console.error("Gemini API Error:", err);
-    throw new Error(err.message || "An error occurred while communicating with the Gemini API.");
+    throw new Error(err.message || "Communication error with Gemini API.");
   }
 };
