@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { SolidityAnalysis } from "../types.ts";
 
 export const analyzeSolidityCode = async (code: string, error: string): Promise<SolidityAnalysis> => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.API_KEY || "AIzaSyA0fMbqjVYvfFlArEjJbNTkBYL7dFNIg0s";
   
   if (!apiKey) {
     throw new Error("System configuration error: API Key missing.");
