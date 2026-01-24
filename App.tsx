@@ -4,13 +4,6 @@ import { analyzeSolidityCode } from './services/geminiService.ts';
 import { SolidityAnalysis } from './types.ts';
 import CodeBlock from './components/CodeBlock.tsx';
 
-declare global {
-  interface Window {
-    // Use any to avoid conflict with existing global AIStudio type and satisfy identical modifiers requirement
-    aistudio: any;
-  }
-}
-
 const App: React.FC = () => {
   const [code, setCode] = useState<string>(`// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
@@ -27,60 +20,19 @@ contract AddFiveToStorage is SimpleStorage {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysis, setAnalysis] = useState<SolidityAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState<boolean>(false);
-  const [isCheckingKey, setIsCheckingKey] = useState<boolean>(true);
 
   const resultRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    checkApiKey();
-  }, []);
-
-  const checkApiKey = async () => {
-    try {
-      // Use optional chaining to safely check if window.aistudio is available
-      const selected = await window.aistudio?.hasSelectedApiKey();
-      setHasKey(selected || !!process.env.API_KEY);
-    } catch (e) {
-      setHasKey(!!process.env.API_KEY);
-    } finally {
-      setIsCheckingKey(false);
-    }
-  };
-
-  const handleConnectKey = async () => {
-    try {
-      // Trigger API key selection dialog
-      await window.aistudio?.openSelectKey();
-      // Assume success per instructions and update state to proceed
-      setHasKey(true);
-    } catch (e) {
-      setError("Failed to open API key selection dialog.");
-    }
-  };
 
   const handleFix = async () => {
     if (!code.trim()) return;
     
-    // Final check before proceeding - prompt for key if missing
-    if (!hasKey && !process.env.API_KEY) {
-      await handleConnectKey();
-      return;
-    }
-
     setIsAnalyzing(true);
     setError(null);
     try {
       const result = await analyzeSolidityCode(code, errorMsg);
       setAnalysis(result);
     } catch (err: any) {
-      // If the error suggests key issues or not found, reset key state to prompt re-selection
-      if (err.message?.includes("entity was not found") || err.message?.includes("API key")) {
-        setError("API Key verification failed. Please re-select your key from a paid project.");
-        setHasKey(false);
-      } else {
-        setError(err.message || "An unexpected error occurred during analysis.");
-      }
+      setError(err.message || "An unexpected error occurred during analysis.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -92,21 +44,13 @@ contract AddFiveToStorage is SimpleStorage {
     }
   }, [analysis]);
 
-  if (isCheckingKey) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-[#020617] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/10 via-[#020617] to-[#020617] text-slate-200 p-4 md:p-8 selection:bg-indigo-500/30 font-sans">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="inline-flex items-center justify-center p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+            <div className="inline-flex items-center justify-center p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 shadow-xl shadow-indigo-500/5">
               <i className="fas fa-microchip text-indigo-400 text-3xl"></i>
             </div>
             <div>
@@ -114,93 +58,62 @@ contract AddFiveToStorage is SimpleStorage {
                 Solidity<span className="text-indigo-500">Fix</span> AI
               </h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`w-2 h-2 rounded-full ${hasKey ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">
-                  {hasKey ? 'API Active: Gemini 3 Pro' : 'API Disconnected'}
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
+                  Audit Engine Online
                 </p>
               </div>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleConnectKey}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-semibold"
-            >
-              <i className="fas fa-key"></i>
-              {hasKey ? 'Change Key' : 'Connect API Key'}
-            </button>
-          </div>
         </header>
-
-        {/* API Selection Overlay if not connected */}
-        {!hasKey && !process.env.API_KEY && (
-          <div className="bg-indigo-600/10 border border-indigo-500/30 rounded-3xl p-8 mb-12 flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-top-4">
-            <div className="max-w-2xl">
-              <h2 className="text-2xl font-bold text-white mb-2">Setup Required</h2>
-              <p className="text-slate-400 leading-relaxed">
-                To use the advanced Gemini 3 Pro debugger, you must select an API key from a paid GCP project. 
-                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-indigo-400 hover:underline ml-1">
-                  Learn more about billing.
-                </a>
-              </p>
-            </div>
-            <button 
-              onClick={handleConnectKey}
-              className="whitespace-nowrap px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
-            >
-              Select API Key
-            </button>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Section */}
           <div className="space-y-6">
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-2xl">
               <div className="flex items-center gap-2 mb-4">
                 <i className="fas fa-code text-indigo-400"></i>
-                <h2 className="text-xl font-bold">Solidity Code</h2>
+                <h2 className="text-lg font-bold text-white/90">Smart Contract Code</h2>
               </div>
               <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full h-80 bg-slate-950/50 text-emerald-400 font-mono p-4 rounded-xl border border-slate-800 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all resize-none placeholder:text-slate-700"
-                placeholder="Paste your Solidity contract here..."
+                className="w-full h-80 bg-[#020617]/60 text-emerald-400 font-mono p-5 rounded-2xl border border-slate-800/50 focus:ring-2 focus:ring-indigo-500/40 outline-none transition-all resize-none placeholder:text-slate-800 text-sm leading-relaxed"
+                placeholder="Paste your Solidity code here..."
               />
             </div>
 
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-2xl">
               <div className="flex items-center gap-2 mb-4">
                 <i className="fas fa-bug text-rose-400"></i>
-                <h2 className="text-xl font-bold">Error Message</h2>
+                <h2 className="text-lg font-bold text-white/90">Compiler Error</h2>
               </div>
               <textarea
                 value={errorMsg}
                 onChange={(e) => setErrorMsg(e.target.value)}
-                className="w-full h-32 bg-slate-950/50 text-rose-300 font-mono p-4 rounded-xl border border-slate-800 focus:ring-2 focus:ring-rose-500/50 outline-none transition-all resize-none placeholder:text-slate-700"
-                placeholder="Paste the compiler error here..."
+                className="w-full h-32 bg-[#020617]/60 text-rose-300 font-mono p-5 rounded-2xl border border-slate-800/50 focus:ring-2 focus:ring-rose-500/40 outline-none transition-all resize-none placeholder:text-slate-800 text-sm"
+                placeholder="Paste the error message..."
               />
             </div>
 
             <button
               onClick={handleFix}
               disabled={isAnalyzing}
-              className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all ${
+              className={`w-full py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all ${
                 isAnalyzing 
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl shadow-indigo-600/20 active:scale-[0.98]'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xl shadow-indigo-600/30 active:scale-[0.97]'
               }`}
             >
               {isAnalyzing ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin"></div>
-                  Analyzing Contract...
+                  <div className="w-6 h-6 border-3 border-slate-500 border-t-white rounded-full animate-spin"></div>
+                  Analyzing...
                 </>
               ) : (
                 <>
                   <i className="fas fa-wand-magic-sparkles"></i>
-                  {hasKey ? 'Fix This Error' : 'Connect Key to Start'}
+                  Analyze & Fix Contract
                 </>
               )}
             </button>
@@ -209,62 +122,67 @@ contract AddFiveToStorage is SimpleStorage {
           {/* Output Section */}
           <div className="space-y-6">
             {!analysis && !error && !isAnalyzing && (
-              <div className="h-full border-2 border-dashed border-slate-800/50 rounded-2xl flex flex-col items-center justify-center text-slate-600 p-12 text-center group">
-                <div className="p-6 rounded-full bg-slate-900/30 mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <i className="fas fa-shield-halved text-6xl opacity-20"></i>
+              <div className="h-full min-h-[400px] border-2 border-dashed border-slate-800/80 rounded-3xl flex flex-col items-center justify-center text-slate-600 p-12 text-center group">
+                <div className="p-8 rounded-full bg-slate-900/40 mb-8 group-hover:scale-110 transition-transform duration-700 ease-out border border-white/5">
+                  <i className="fas fa-shield-halved text-7xl opacity-10"></i>
                 </div>
-                <h3 className="text-xl font-semibold mb-2 text-slate-400">Debugger Engine Ready</h3>
-                <p className="max-w-xs text-slate-500">Upload your code and get instant, optimized fixes for your smart contracts.</p>
+                <h3 className="text-2xl font-bold mb-3 text-slate-400">Analysis Engine Idle</h3>
+                <p className="max-w-sm text-slate-500 leading-relaxed font-medium">Input your contract and the error to receive a full AI audit and code correction.</p>
               </div>
             )}
 
             {isAnalyzing && (
-              <div className="space-y-4 animate-pulse">
-                <div className="h-12 bg-slate-900 rounded-xl w-3/4"></div>
-                <div className="h-32 bg-slate-900 rounded-xl"></div>
-                <div className="h-64 bg-slate-900 rounded-xl"></div>
+              <div className="space-y-6">
+                <div className="h-14 bg-slate-900/50 rounded-2xl w-2/3 animate-pulse"></div>
+                <div className="h-40 bg-slate-900/50 rounded-2xl animate-pulse"></div>
+                <div className="h-80 bg-slate-900/50 rounded-2xl animate-pulse"></div>
               </div>
             )}
 
             {error && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-rose-300 flex items-start gap-4 animate-in slide-in-from-top-4 duration-300">
-                <i className="fas fa-triangle-exclamation text-xl mt-1"></i>
+              <div className="bg-rose-500/5 border border-rose-500/20 rounded-3xl p-8 text-rose-300 flex items-start gap-5 animate-in slide-in-from-right-4 duration-500">
+                <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500">
+                  <i className="fas fa-exclamation-circle text-2xl"></i>
+                </div>
                 <div className="flex-1 whitespace-pre-line">
-                  <h3 className="font-bold text-lg mb-1">Execution Error</h3>
-                  <p>{error}</p>
+                  <h3 className="font-black text-xl mb-2 text-rose-200 uppercase tracking-tight">System Message</h3>
+                  <p className="text-rose-300/80 font-medium leading-relaxed">{error}</p>
                 </div>
               </div>
             )}
 
             {analysis && (
-              <div ref={resultRef} className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl ring-1 ring-indigo-500/20">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
-                      <i className="fas fa-lightbulb"></i>
+              <div ref={resultRef} className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl ring-1 ring-indigo-500/10">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400">
+                      <i className="fas fa-brain text-xl"></i>
                     </div>
-                    <h2 className="text-xl font-bold text-white">Analysis & Fix</h2>
+                    <h2 className="text-2xl font-black text-white tracking-tight">AI Diagnostic</h2>
                   </div>
-                  <div className="prose prose-invert max-w-none mb-6">
-                    <p className="text-slate-300 leading-relaxed whitespace-pre-wrap text-base">
+                  
+                  <div className="bg-[#020617]/50 rounded-2xl p-6 mb-8 border border-white/5">
+                    <p className="text-slate-300 leading-relaxed whitespace-pre-wrap text-base font-medium">
                       {analysis.explanation}
                     </p>
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest">Corrected Main Contract</h3>
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em]">Corrected Implementation</h3>
+                    </div>
                     <CodeBlock code={analysis.suggestedFix} />
                   </div>
                   
                   {analysis.missingFiles && analysis.missingFiles.length > 0 && (
-                    <div className="mt-10 border-t border-slate-800 pt-8">
-                      <div className="flex items-center gap-2 mb-4">
-                        <i className="fas fa-folder-tree text-emerald-400"></i>
-                        <h3 className="text-sm font-semibold text-emerald-400 uppercase tracking-widest">Required Dependencies</h3>
+                    <div className="mt-12 border-t border-slate-800 pt-10">
+                      <div className="flex items-center gap-3 mb-6">
+                        <i className="fas fa-cubes text-emerald-400 text-lg"></i>
+                        <h3 className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">Dependent Contracts</h3>
                       </div>
-                      <div className="space-y-6">
+                      <div className="space-y-8">
                         {analysis.missingFiles.map((file, idx) => (
-                          <div key={idx} className="space-y-2">
+                          <div key={idx}>
                             <CodeBlock code={file.content} filename={file.filename} />
                           </div>
                         ))}
@@ -277,8 +195,10 @@ contract AddFiveToStorage is SimpleStorage {
           </div>
         </div>
 
-        <footer className="mt-20 pt-10 border-t border-slate-900 text-center">
-          <p className="text-slate-500 text-sm">© 2024 SolidityFix AI. Powered by Gemini 3 Pro.</p>
+        <footer className="mt-20 py-12 border-t border-white/5 flex flex-col items-center gap-4">
+          <p className="text-slate-500 text-sm font-semibold uppercase tracking-widest">
+            Audit Engine v1.0 • Gemini 3 Pro
+          </p>
         </footer>
       </div>
     </div>

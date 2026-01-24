@@ -6,8 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SolidityFix AI</title>
   <script>
-    // Critical: Initialize process.env shim before any modules load
-    window.process = window.process || { env: {} };
+    // Initialize process.env shim with the provided API key
+    window.process = { 
+      env: { 
+        API_KEY: 'AIzaSyA0fMbqjVYvfFlArEjJbNTkBYL7dFNIg0s' 
+      } 
+    };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,15 +19,15 @@
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #0f172a;
+      background-color: #020617;
     }
     .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
     ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    ::-webkit-scrollbar-track { background: #020617; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
   <script type="importmap">
 {

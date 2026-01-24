@@ -3,21 +3,19 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { SolidityAnalysis } from "../types.ts";
 
 export const analyzeSolidityCode = async (code: string, error: string): Promise<SolidityAnalysis> => {
-  // Always grab the key right before the call
   const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
-    throw new Error("API Key not found in environment. Please use the 'Connect API Key' button in the header.");
+    throw new Error("System configuration error: API Key missing.");
   }
 
-  // World-class implementation: Initialize right before generateContent
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
     Analyze the following Solidity code and the associated compiler/runtime error.
     Return a JSON object with:
-    1. explanation: Detailed fix explanation.
-    2. suggestedFix: Complete corrected code.
+    1. explanation: Concise explanation of the bug.
+    2. suggestedFix: Complete corrected code block for the main file.
     3. missingFiles: (Optional) Array of {filename, content} for missing dependencies.
     4. isCritical: Boolean.
     
@@ -54,27 +52,21 @@ export const analyzeSolidityCode = async (code: string, error: string): Promise<
           },
           required: ["explanation", "suggestedFix", "isCritical"],
         },
-        systemInstruction: "You are a world-class Solidity auditor. Fix the contract error and provide the full corrected code in JSON format.",
+        systemInstruction: "You are a senior Solidity auditor. Fix the contract error and provide the full corrected code in JSON. Be precise and technical.",
       },
     });
 
     const text = response.text;
-    if (!text) throw new Error("The model returned an empty response.");
+    if (!text) throw new Error("The engine returned an empty audit report.");
     
     try {
       return JSON.parse(text) as SolidityAnalysis;
     } catch (parseErr) {
-      console.error("JSON Parse Error:", text);
-      throw new Error("Failed to parse the AI analysis result. Please try again.");
+      console.error("Diagnostic Parse Error:", text);
+      throw new Error("The engine produced an invalid report. Please re-run the analysis.");
     }
   } catch (err: any) {
-    console.error("Gemini API Error:", err);
-    
-    // If it's a 404/Not Found for the project entity, it usually means the key doesn't have the right project enabled.
-    if (err.message?.includes("Requested entity was not found")) {
-      throw new Error("Requested entity was not found. Please ensure your API Key is linked to a project with the Gemini 3 Pro API enabled.");
-    }
-    
-    throw new Error(err.message || "Communication error with Gemini API.");
+    console.error("Gemini Engine Error:", err);
+    throw new Error(err.message || "Failed to communicate with the analysis engine.");
   }
 };
